@@ -1,195 +1,270 @@
 const world = document.getElementById('world');
 const hotbar = document.getElementById('hotbar');
 
-const rows = 10;
-const cols = 20;
+const totalCols = 20;   // tamanho real do mundo
+const totalRows = 30
+;
+
+const viewCols = 20;     // viewport visível fixa
+const viewRows = 10;
+
 const blockSize = 32;
 
-const blockTypes = ['grass', 'dirt']; // blocos disponíveis
-
-let selectedBlockIndex = 0;
-
-// Inventário — quantidade de cada bloco
+const blockTypes = ['grass', 'dirt', 'leaves'];
 const inventory = {
   grass: 5,
-  dirt: 10
+  dirt: 10,
+  leaves: 0,
 };
 
-// Mapa para guardar o estado dos blocos
+let selectedBlock = 0;
 const blocks = [];
 
-// Cria o mundo
-for (let y = 0; y < rows; y++) {
-  for (let x = 0; x < cols; x++) {
-    const block = document.createElement('div');
-    block.classList.add('block');
+let playerX = 0;
+let playerY = 0;
+let velocityY = 0;
 
-    if (y > 6) {
-      block.classList.add(y === 7 ? 'grass' : 'dirt');
-    } else {
-      block.classList.add('empty');
-    }
+const gravity = 0.3;
+const jumpPower = -3.5;
+const maxFallSpeed = 5;
 
-    block.dataset.x = x;
-    block.dataset.y = y;
+// Gera o mundo todo (200x30)
+function generateWorld() {
+  world.innerHTML = '';
+  blocks.length = 0;
 
-    block.addEventListener('click', () => {
-      if (!block.classList.contains('empty')) {
-        // Quebra o bloco, adiciona ao inventário
-        const type = getBlockType(block);
-        if (type) {
-          inventory[type] = (inventory[type] || 0) + 1;
-          updateHotbar();
-        }
-        block.className = 'block empty';
+  for (let y = 0; y < totalRows; y++) {
+    for (let x = 0; x < totalCols; x++) {
+      const block = document.createElement('div');
+      block.classList.add('block');
+
+      if (y > 26) {
+        block.classList.add(y === 27 ? 'grass' : 'dirt');
       } else {
-        // Coloca bloco só se tiver no inventário
-        const type = blockTypes[selectedBlockIndex];
-        if (inventory[type] > 0) {
-          block.className = `block ${type}`;
-          inventory[type]--;
-          updateHotbar();
-        }
+        block.classList.add('empty');
       }
-    });
 
-    world.appendChild(block);
-    blocks.push(block);
+      block.dataset.x = x;
+      block.dataset.y = y;
+      world.appendChild(block);
+      blocks.push(block);
+    }
+  }
+
+  addTrees();
+}
+
+// Adiciona árvores simples, pode adaptar posição para o mundo maior
+function addTrees() {
+  const positions = [4, 10, 16, 50, 120, 180]; // algumas posições espalhadas
+  positions.forEach(x => {
+    const baseY = 26;
+
+    setBlock(x, baseY, 'dirt');     // tronco
+    setBlock(x, baseY - 1, 'dirt'); // tronco
+    setBlock(x, baseY - 2, 'leaves');
+    setBlock(x, baseY - 3, 'leaves');
+    setBlock(x - 1, baseY - 2, 'leaves');
+    setBlock(x + 1, baseY - 2, 'leaves');
+  });
+}
+
+function getBlock(x, y) {
+  if (x < 0 || x >= totalCols || y < 0 || y >= totalRows) return null;
+  return blocks[y * totalCols + x];
+}
+
+function setBlock(x, y, type) {
+  const block = getBlock(x, y);
+  if (block) {
+    block.className = `block ${type}`;
   }
 }
 
-function getBlockType(block) {
-  for (const type of blockTypes) {
-    if (block.classList.contains(type)) return type;
-  }
-  return null;
+function isSolid(x, y) {
+  const block = getBlock(x, y);
+  return block && !block.classList.contains('empty');
 }
 
-// Cria o player
+// Posiciona o player no canto esquerdo, no topo do chão
+function placePlayer() {
+  playerX = 0;
+  for (let y = 1; y < totalRows; y++) {
+    if (!isSolid(playerX, y) && isSolid(playerX, y + 1)) {
+      playerY = y;
+      updatePlayer();
+      return;
+    }
+  }
+}
+
+// Player DOM
 const player = document.createElement('div');
 player.id = 'player';
 world.appendChild(player);
 
-let playerX = 10;
-let playerY = 5;
-
-let velocityY = 0; // velocidade vertical do player
-const gravity = 0.3;
-const jumpStrength = -6;
-const maxFallSpeed = 5;
-
-function updatePlayerPosition() {
+function updatePlayer() {
   player.style.left = playerX * blockSize + 2 + 'px';
-  player.style.top = playerY * blockSize + 2 + 'px';
-}
-updatePlayerPosition();
+  player.style.top = (playerY - 1) * blockSize + 2 + 'px';
 
-// Função que verifica se posição (x,y) é bloco sólido
-function isSolidBlock(x, y) {
-  if (x < 0 || x >= cols || y < 0 || y >= rows) return true;
-  const block = blocks[y * cols + x];
-  return !block.classList.contains('empty');
+  updateScroll();
 }
 
-// Gravidade e movimentação vertical
+// Atualiza o scroll (translada o mundo para centralizar o player)
+function updateScroll() {
+  const viewportWidthPx = viewCols * blockSize;
+  const viewportHeightPx = viewRows * blockSize;
+
+  // Calcula o deslocamento para centralizar o player na viewport
+  let scrollX = playerX * blockSize - viewportWidthPx / 2 + blockSize / 2;
+  let scrollY = playerY * blockSize - viewportHeightPx / 2 + blockSize / 2;
+
+  // Limita scroll para não ultrapassar as bordas do mundo
+  const maxScrollX = totalCols * blockSize - viewportWidthPx;
+  const maxScrollY = totalRows * blockSize - viewportHeightPx;
+
+  scrollX = Math.max(0, Math.min(scrollX, maxScrollX));
+  scrollY = Math.max(0, Math.min(scrollY, maxScrollY));
+
+  // Aplica a transformação
+  world.style.transform = `translate(${-scrollX}px, ${-scrollY}px)`;
+}
+
+// Física do player
+function canMoveTo(x, y) {
+  return !isSolid(x, Math.floor(y)) && !isSolid(x, Math.floor(y) - 1);
+}
+
 function gameLoop() {
   velocityY += gravity;
   if (velocityY > maxFallSpeed) velocityY = maxFallSpeed;
 
   let nextY = playerY + velocityY * 0.1;
 
-  // Verifica colisão embaixo
   if (velocityY > 0) {
-    if (isSolidBlock(playerX, Math.floor(nextY + 1))) {
+    if (!canMoveTo(playerX, Math.floor(nextY) + 1)) {
       velocityY = 0;
       playerY = Math.floor(nextY);
     } else {
       playerY = nextY;
     }
-  } else if (velocityY < 0) {
-    // Subindo: colisão no teto
-    if (isSolidBlock(playerX, Math.floor(nextY))) {
+  } else {
+    if (!canMoveTo(playerX, Math.floor(nextY))) {
       velocityY = 0;
     } else {
       playerY = nextY;
     }
   }
 
-  // Mantém player dentro do mundo verticalmente
-  if (playerY > rows - 1) playerY = rows - 1;
-  if (playerY < 0) playerY = 0;
-
-  updatePlayerPosition();
+  updatePlayer();
   requestAnimationFrame(gameLoop);
 }
-requestAnimationFrame(gameLoop);
 
-// Movimento horizontal com setas
+// Entrada do teclado
 window.addEventListener('keydown', e => {
-  if (e.repeat) return;
-
   if (e.key === 'ArrowLeft') {
     const newX = playerX - 1;
-    if (newX >= 0 && !isSolidBlock(newX, Math.floor(playerY))) {
-      playerX = newX;
-      updatePlayerPosition();
-    }
-  } else if (e.key === 'ArrowRight') {
+    if (canMoveTo(newX, playerY)) playerX = newX;
+  }
+
+  if (e.key === 'ArrowRight') {
     const newX = playerX + 1;
-    if (newX < cols && !isSolidBlock(newX, Math.floor(playerY))) {
-      playerX = newX;
-      updatePlayerPosition();
+    if (canMoveTo(newX, playerY)) playerX = newX;
+  }
+
+  if (e.key === ' ') {
+    if (!canMoveTo(playerX, Math.floor(playerY) + 1)) {
+      velocityY = jumpPower;
     }
-  } else if (e.key === ' ') {
-    // Pular se estiver no chão
-    if (isSolidBlock(playerX, Math.floor(playerY + 1))) {
-      velocityY = jumpStrength;
+  }
+
+  if (e.key >= '1' && e.key <= '3') {
+    selectedBlock = parseInt(e.key) - 1;
+    updateHotbar();
+  }
+
+  updatePlayer();
+});
+
+// Interação de clique (você pode precisar adaptar para lidar com offset da câmera)
+world.addEventListener('click', e => {
+  // Calcula posição do clique relativa ao mundo real considerando scroll
+  const rect = world.getBoundingClientRect();
+
+  // Pegando scroll atual:
+  const style = window.getComputedStyle(world);
+  const matrix = new WebKitCSSMatrix(style.transform);
+
+  const scrollX = -matrix.m41;
+  const scrollY = -matrix.m42;
+
+  const clickX = e.clientX - rect.left + scrollX;
+  const clickY = e.clientY - rect.top + scrollY;
+
+  const x = Math.floor(clickX / blockSize);
+  const y = Math.floor(clickY / blockSize);
+
+  const block = getBlock(x, y);
+  if (!block) return;
+
+  if (!block.classList.contains('empty')) {
+    const type = blockTypes.find(t => block.classList.contains(t));
+    if (type) {
+      inventory[type] = (inventory[type] || 0) + 1;
+      setBlock(x, y, 'empty');
+      updateHotbar();
     }
-  } else if (e.key === '1') {
-    selectHotbarSlot(0);
-  } else if (e.key === '2') {
-    selectHotbarSlot(1);
+  } else {
+    const type = blockTypes[selectedBlock];
+    if (inventory[type] > 0) {
+      if (type === 'leaves') {
+        const below = getBlock(x, y + 1);
+        if (below && !below.classList.contains('empty')) {
+          setBlock(x, y, type);
+          inventory[type]--;
+          updateHotbar();
+        }
+      } else {
+        setBlock(x, y, type);
+        inventory[type]--;
+        updateHotbar();
+      }
+    }
   }
 });
 
-// Cria hotbar
+// Hotbar
 function createHotbar() {
   hotbar.innerHTML = '';
-  blockTypes.forEach((blockType, i) => {
+  blockTypes.forEach((type, i) => {
     const slot = document.createElement('div');
     slot.classList.add('hotbar-slot');
-    if (i === selectedBlockIndex) slot.classList.add('selected');
+    if (i === selectedBlock) slot.classList.add('selected');
 
-    const blockIcon = document.createElement('div');
-    blockIcon.classList.add('hotbar-block', blockType);
+    const icon = document.createElement('div');
+    icon.classList.add('hotbar-block', type);
 
-    const countLabel = document.createElement('div');
-    countLabel.classList.add('count');
-    countLabel.textContent = inventory[blockType] || 0;
+    const count = document.createElement('div');
+    count.classList.add('count');
+    count.textContent = inventory[type] || 0;
 
-    slot.appendChild(blockIcon);
-    slot.appendChild(countLabel);
+    slot.appendChild(icon);
+    slot.appendChild(count);
+    hotbar.appendChild(slot);
 
     slot.addEventListener('click', () => {
-      selectHotbarSlot(i);
+      selectedBlock = i;
+      updateHotbar();
     });
-
-    hotbar.appendChild(slot);
   });
 }
-createHotbar();
 
 function updateHotbar() {
-  blockTypes.forEach((blockType, i) => {
-    const slot = hotbar.children[i];
-    const countLabel = slot.querySelector('.count');
-    countLabel.textContent = inventory[blockType] || 0;
-  });
+  createHotbar();
 }
 
-function selectHotbarSlot(i) {
-  if (i < 0 || i >= blockTypes.length) return;
-  document.querySelectorAll('.hotbar-slot').forEach(s => s.classList.remove('selected'));
-  hotbar.children[i].classList.add('selected');
-  selectedBlockIndex = i;
-}
+// Inicialização
+generateWorld();
+placePlayer();
+createHotbar();
+gameLoop();

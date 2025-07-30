@@ -1,107 +1,744 @@
 <!DOCTYPE html>
-<html lang="pt-BR" >
+<html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>JavaCraft</title>
-  <style>
-    body {
-      background-color: #87ceeb; /* céu */
-      margin: 0;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      user-select: none;
-    }
-    #world {
-      flex: 1;
-      display: grid;
-      grid-template-columns: repeat(20, 32px);
-      grid-template-rows: repeat(10, 32px);
-      position: relative;
-      background-color: #87ceeb;
-    }
-    .block {
-      width: 32px;
-      height: 32px;
-      border: 1px solid #999;
-      box-sizing: border-box;
-    }
-    .grass { background-color: #228B22; }
-    .dirt  { background-color: #8B4513; }
-    .empty { background-color: transparent; border: none; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Minecraft 2D - Crafting Drag & Drop</title>
+<style>
+  body {
+    font-family: monospace;
+    background: #222;
+    color: white;
+    margin: 0;
+    padding: 10px;
+    user-select: none;
+  }
+  #menu {
+    text-align: center;
+    margin-top: 50px;
+  }
+  #game {
+    display: grid;
+    grid-template-columns: repeat(20, 24px);
+    grid-template-rows: repeat(15, 24px);
+    gap: 1px;
+    background: #111;
+    width: max-content;
+    margin: 20px auto;
+  }
+  .block {
+    width: 24px;
+    height: 24px;
+    box-sizing: border-box;
+    border: 1px solid #333;
+  }
+  /* Cores planas dos blocos */
+  .grass { background: #3c9a10; }
+  .dirt { background: #6b4c2b; }
+  .stone { background: #7d7d7d; }
+  .wood { background: #a67c33; }
+  .air { background: #222; border: none; }
 
-    /* Player */
-    #player {
-      position: absolute;
-      width: 28px;
-      height: 28px;
-      background-color: red;
-      border: 2px solid black;
-      box-sizing: border-box;
-      transition: top 0.1s, left 0.1s;
-      pointer-events: none;
-      z-index: 10;
-      border-radius: 4px;
-    }
+  /* Player */
+  .player {
+    background: #e62e00;
+    border: 2px solid #ff7f50;
+    box-sizing: border-box;
+  }
+  /* Mob */
+  .mob {
+    background: #0033cc;
+    border-radius: 50%;
+    border: 2px solid #5599ff;
+  }
 
-    /* Hotbar */
-    #hotbar {
-      height: 50px;
-      background: #333;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 10px;
-      padding: 5px;
-      user-select: none;
-      color: white;
-      font-family: monospace;
-      font-weight: bold;
-    }
-    .hotbar-slot {
-      width: 60px;
-      height: 40px;
-      border: 2px solid #666;
-      box-sizing: border-box;
-      cursor: pointer;
-      border-radius: 4px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background-color: #222;
-      transition: border-color 0.3s;
-      position: relative;
-      color: white;
-      font-size: 16px;
-    }
-    .hotbar-slot.selected {
-      border-color: yellow;
-    }
-    .hotbar-block {
-      width: 28px;
-      height: 28px;
-      border: 1px solid #999;
-      border-radius: 2px;
-      margin-bottom: 2px;
-    }
-    .hotbar-block.grass { background-color: #228B22; }
-    .hotbar-block.dirt { background-color: #8B4513; }
-    .count {
-      position: absolute;
-      bottom: 2px;
-      right: 4px;
-      font-size: 14px;
-      color: #fff;
-      text-shadow: 1px 1px 3px #000;
-    }
-  </style>
+  /* Inventário */
+  #inventory, #item-inventory {
+    display: flex;
+    justify-content: center;
+    margin: 10px auto;
+    gap: 10px;
+    max-width: 520px;
+  }
+  .inv-slot, .item-slot {
+    width: 36px;
+    height: 36px;
+    border: 2px solid #555;
+    border-radius: 5px;
+    position: relative;
+    cursor: grab;
+    background: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .inv-slot.selected, .item-slot.selected {
+    border-color: #fff;
+  }
+  .item-count {
+    position: absolute;
+    bottom: 2px;
+    right: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 2px black;
+    user-select: none;
+  }
+  /* Cores dos itens inventário (mesmas cores dos blocos + extras) */
+  .inv-slot.grass, .item-slot.grass { background: #3c9a10; }
+  .inv-slot.dirt, .item-slot.dirt { background: #6b4c2b; }
+  .inv-slot.stone, .item-slot.stone { background: #7d7d7d; }
+  .inv-slot.wood, .item-slot.wood { background: #a67c33; }
+  .item-slot.plank { background: #c6a15e; }
+  .item-slot.pickaxe { background: #444; border-radius: 3px; }
+
+  /* Botão abrir crafting */
+  #btnOpenCrafting {
+    display: block;
+    margin: 10px auto;
+    padding: 8px 18px;
+    font-weight: bold;
+    border-radius: 6px;
+    border: none;
+    background: #444;
+    color: white;
+    cursor: pointer;
+  }
+  #btnOpenCrafting:hover {
+    background: #666;
+  }
+
+  /* Crafting UI */
+  #crafting-ui {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 360px;
+    background: #333;
+    border: 3px solid #777;
+    border-radius: 12px;
+    padding: 15px;
+    transform: translate(-50%, -50%);
+    display: none;
+    color: white;
+    z-index: 200;
+  }
+  #crafting-ui h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  #crafting-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 48px);
+    grid-template-rows: repeat(3, 48px);
+    gap: 6px;
+    justify-content: center;
+    margin-bottom: 15px;
+  }
+  .craft-slot {
+    width: 48px;
+    height: 48px;
+    border: 2px solid #555;
+    border-radius: 6px;
+    background: #222;
+    position: relative;
+  }
+  .craft-slot[data-type] {
+    cursor: default;
+  }
+  .craft-slot.dragover {
+    border-color: #ffcc00;
+    box-shadow: 0 0 6px #ffcc00 inset;
+  }
+  .craft-slot .item-count {
+    font-size: 16px;
+  }
+
+  #craft-result {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 15px auto;
+    border: 3px solid #4caf50;
+    border-radius: 10px;
+    background: #222;
+    position: relative;
+    cursor: pointer;
+  }
+  #craft-result[data-type] {
+    cursor: pointer;
+  }
+  #craft-result .item-count {
+    font-size: 18px;
+  }
+  #craft-result.empty {
+    border-color: #555;
+    cursor: default;
+  }
+
+  #btnCraft {
+    display: block;
+    margin: 0 auto;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    background: #4caf50;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  #btnCraft:disabled {
+    background: #777;
+    cursor: not-allowed;
+  }
+
+  /* Close button */
+  #btnCloseCraft {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: #555;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: bold;
+    padding: 2px 8px;
+    cursor: pointer;
+  }
+</style>
 </head>
 <body>
-  <div id="world"></div>
-  <div id="hotbar"></div>
 
-  <script src="game.js"></script>
+<div id="menu">
+  <h1>Minecraft 2D</h1>
+  <button id="btnNewGame">Novo Jogo</button>
+  <button id="btnContinue">Continuar</button>
+</div>
+
+<div id="game" style="display:none;"></div>
+
+<div id="inventory" style="display:none;" title="Inventário de blocos"></div>
+<div id="item-inventory" style="display:none;" title="Inventário de itens"></div>
+
+<button id="btnOpenCrafting" style="display:none;">Abrir Crafting</button>
+
+<div id="crafting-ui" role="dialog" aria-modal="true" aria-labelledby="crafting-title">
+  <button id="btnCloseCraft" aria-label="Fechar crafting">X</button>
+  <h3 id="crafting-title">Área de Crafting</h3>
+  <div id="crafting-grid">
+    <!-- 3x3 slots para itens de crafting -->
+  </div>
+  <div id="craft-result" class="empty" title="Resultado do Crafting"></div>
+  <button id="btnCraft" disabled>Craftar</button>
+</div>
+
+<script>
+(() => {
+  const width = 20;
+  const height = 15;
+  const solidBlocks = ["grass", "dirt", "stone", "wood"];
+
+  // Mundo
+  let world = [];
+  let playerX = 10;
+  let playerY = 7;
+
+  // Inventários
+  let blockCounts = { grass: 0, dirt: 0, stone: 0, wood: 0 };
+  let items = { plank: 0, pickaxe: 0 };
+
+  // Mobs
+  let mobs = [
+    { x: 5, y: 7, dir: 1 },
+    { x: 14, y: 6, dir: -1 }
+  ];
+
+  // Crafting Recipes: matriz 3x3 para facilitar
+  // As receitas são objetos com matriz 3x3 onde cada célula é tipo ou null
+  // e um objeto "produces" com item e quantidade
+  const craftingRecipes = [
+    {
+      name: "Tábuas",
+      pattern: [
+        [null, null, null],
+        [null, "wood", null],
+        [null, null, null]
+      ],
+      produces: { plank: 4 }
+    },
+    {
+      name: "Picareta",
+      pattern: [
+        ["stone", "stone", "stone"],
+        [null, "plank", null],
+        [null, "plank", null]
+      ],
+      produces: { pickaxe: 1 }
+    }
+  ];
+
+  // DOM refs
+  const menu = document.getElementById("menu");
+  const gameDiv = document.getElementById("game");
+  const inventoryDiv = document.getElementById("inventory");
+  const itemInventoryDiv = document.getElementById("item-inventory");
+  const btnOpenCrafting = document.getElementById("btnOpenCrafting");
+  const craftingUI = document.getElementById("crafting-ui");
+  const craftingGrid = document.getElementById("crafting-grid");
+  const craftResult = document.getElementById("craft-result");
+  const btnCraft = document.getElementById("btnCraft");
+  const btnCloseCraft = document.getElementById("btnCloseCraft");
+
+  // Seleção e drag state
+  let selectedBlock = null; // para colocar no mundo (do inventário)
+  let selectedItem = null;  // para usar na mão (itens craftados)
+  let draggingItem = null;  // {type, source: "inventory"|"itemInventory", index}
+
+  // Área crafting slots, 3x3
+  const craftSlots = [];
+
+  // Inicializa crafting grid slots
+  function createCraftSlots() {
+    craftingGrid.innerHTML = "";
+    for (let i = 0; i < 9; i++) {
+      const slot = document.createElement("div");
+      slot.className = "craft-slot";
+      slot.dataset.index = i;
+      slot.dataset.type = ""; // vazio
+      slot.setAttribute("aria-label", "Slot de crafting vazio");
+      craftingGrid.appendChild(slot);
+      craftSlots.push(slot);
+      setupCraftSlotDragEvents(slot);
+    }
+  }
+
+  // Mundo vazio padrão
+  function createEmptyWorld() {
+    world = [];
+    for (let y = 0; y < height; y++) {
+      let row = [];
+      for (let x = 0; x < width; x++) {
+        if (y > 10) row.push("dirt");
+        else if (y === 10) row.push("grass");
+        else row.push("air");
+      }
+      world.push(row);
+    }
+  }
+
+  // Renderiza o mundo no grid
+  function renderWorld() {
+    gameDiv.innerHTML = "";
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const block = document.createElement("div");
+        block.classList.add("block");
+        const mobHere = mobs.find(m => m.x === x && m.y === y);
+        if (playerX === x && playerY === y) {
+          block.classList.add("player");
+        } else if (mobHere) {
+          block.classList.add("mob");
+        } else {
+          const type = world[y][x];
+          if (type !== "air") block.classList.add(type);
+        }
+        block.dataset.x = x;
+        block.dataset.y = y;
+        gameDiv.appendChild(block);
+      }
+    }
+  }
+
+  // Renderiza inventário de blocos
+  function renderInventorySlots() {
+    inventoryDiv.innerHTML = "";
+    ["grass", "dirt", "stone", "wood"].forEach(block => {
+      const slot = document.createElement("div");
+      slot.classList.add("inv-slot", block);
+      slot.dataset.type = block;
+      slot.setAttribute("draggable", true);
+      if (blockCounts[block] > 0) {
+        const countSpan = document.createElement("span");
+        countSpan.className = "item-count";
+        countSpan.textContent = blockCounts[block];
+        slot.appendChild(countSpan);
+      }
+      if (selectedBlock === block) slot.classList.add("selected");
+      inventoryDiv.appendChild(slot);
+      // Drag events
+      slot.addEventListener("dragstart", e => {
+        draggingItem = { type: block, source: "inventory" };
+        e.dataTransfer.setData("text/plain", block);
+        e.dataTransfer.effectAllowed = "move";
+      });
+      slot.addEventListener("click", () => {
+        selectedBlock = block;
+        selectedItem = null;
+        renderInventorySlots();
+        renderItemInventory();
+      });
+    });
+  }
+
+  // Renderiza inventário de itens craftados
+  function renderItemInventory() {
+    itemInventoryDiv.innerHTML = "";
+    Object.keys(items).forEach(key => {
+      if (items[key] > 0) {
+        const slot = document.createElement("div");
+        slot.classList.add("item-slot", key);
+        slot.dataset.type = key;
+        slot.setAttribute("draggable", true);
+        const countSpan = document.createElement("span");
+        countSpan.className = "item-count";
+        countSpan.textContent = items[key];
+        slot.appendChild(countSpan);
+        if (selectedItem === key) slot.classList.add("selected");
+        itemInventoryDiv.appendChild(slot);
+
+        // Drag events
+        slot.addEventListener("dragstart", e => {
+          draggingItem = { type: key, source: "itemInventory" };
+          e.dataTransfer.setData("text/plain", key);
+          e.dataTransfer.effectAllowed = "move";
+        });
+        slot.addEventListener("click", () => {
+          selectedItem = key;
+          selectedBlock = null;
+          renderInventorySlots();
+          renderItemInventory();
+        });
+      }
+    });
+  }
+
+  // Colocar/quebrar blocos no mundo (clicar)
+  gameDiv.addEventListener("click", e => {
+    if (!e.target.classList.contains("block")) return;
+    const x = +e.target.dataset.x;
+    const y = +e.target.dataset.y;
+    if (playerX === x && playerY === y) return; // Não mexe no player
+
+    const clickedBlock = world[y][x];
+
+    // Quebrar bloco sólido: adiciona ao inventário
+    if (solidBlocks.includes(clickedBlock)) {
+      world[y][x] = "air";
+      blockCounts[clickedBlock] = (blockCounts[clickedBlock] || 0) + 1;
+      saveWorld();
+      renderInventorySlots();
+      renderWorld();
+      return;
+    }
+
+    // Colocar bloco se espaço vazio e bloco selecionado no inventário
+    if (clickedBlock === "air" && selectedBlock && blockCounts[selectedBlock] > 0) {
+      world[y][x] = selectedBlock;
+      blockCounts[selectedBlock]--;
+      saveWorld();
+      renderInventorySlots();
+      renderWorld();
+    }
+  });
+
+  // Salvar tudo no localStorage
+  function saveWorld() {
+    localStorage.setItem("minecraft2d_world", JSON.stringify(world));
+    localStorage.setItem("minecraft2d_playerX", playerX);
+    localStorage.setItem("minecraft2d_playerY", playerY);
+    localStorage.setItem("minecraft2d_blockCounts", JSON.stringify(blockCounts));
+    localStorage.setItem("minecraft2d_items", JSON.stringify(items));
+    localStorage.setItem("minecraft2d_mobs", JSON.stringify(mobs));
+  }
+
+  // Carregar tudo do localStorage ou criar mundo novo
+  function loadWorld() {
+    const savedWorld = JSON.parse(localStorage.getItem("minecraft2d_world"));
+    if (savedWorld) world = savedWorld;
+    else createEmptyWorld();
+
+    playerX = parseInt(localStorage.getItem("minecraft2d_playerX")) || 10;
+    playerY = parseInt(localStorage.getItem("minecraft2d_playerY")) || 7;
+
+    blockCounts = JSON.parse(localStorage.getItem("minecraft2d_blockCounts")) || { grass: 0, dirt: 0, stone: 0, wood: 0 };
+    items = JSON.parse(localStorage.getItem("minecraft2d_items")) || { plank: 0, pickaxe: 0 };
+    mobs = JSON.parse(localStorage.getItem("minecraft2d_mobs")) || mobs;
+  }
+
+  // Movimenta mobs simples (voltar e frente)
+  function moveMobs() {
+    mobs.forEach(mob => {
+      let nx = mob.x + mob.dir;
+      if (nx < 0 || nx >= width || world[mob.y][nx] !== "air") mob.dir *= -1;
+      else mob.x = nx;
+    });
+  }
+
+  // Atualiza interface toda
+  function updateAll() {
+    renderWorld();
+    renderInventorySlots();
+    renderItemInventory();
+  }
+
+  // MOVIMENTAÇÃO PLAYER com WASD ou setas
+  window.addEventListener("keydown", e => {
+    let nx = playerX;
+    let ny = playerY;
+    if (e.key === "ArrowLeft" || e.key === "a") nx--;
+    else if (e.key === "ArrowRight" || e.key === "d") nx++;
+    else if (e.key === "ArrowUp" || e.key === "w") ny--;
+    else if (e.key === "ArrowDown" || e.key === "s") ny++;
+
+    // Verifica limites e se não é sólido
+    if (nx >= 0 && nx < width && ny >= 0 && ny < height && !solidBlocks.includes(world[ny][nx])) {
+      playerX = nx;
+      playerY = ny;
+      saveWorld();
+      renderWorld();
+    }
+  });
+
+  // ----------- CRAFTING -----------------
+
+  // Atualiza slots crafting e resultado
+  function updateCrafting() {
+    // Atualiza o visual dos slots
+    craftSlots.forEach((slot, i) => {
+      slot.innerHTML = "";
+      const type = slot.dataset.type || "";
+      slot.className = "craft-slot";
+      if (type) {
+        slot.classList.add(type);
+        // Quantidade é sempre 1 no crafting slot
+        const countSpan = document.createElement("span");
+        countSpan.className = "item-count";
+        countSpan.textContent = "1";
+        slot.appendChild(countSpan);
+      }
+    });
+
+    // Verifica receita
+    const currentPattern = [];
+    for (let i = 0; i < 9; i++) {
+      const type = craftSlots[i].dataset.type || null;
+      currentPattern.push(type);
+    }
+
+    let matchedRecipe = null;
+
+    craftingRecipes.forEach(recipe => {
+      if (matchPattern(recipe.pattern, currentPattern)) {
+        matchedRecipe = recipe;
+      }
+    });
+
+    if (matchedRecipe) {
+      craftResult.dataset.type = Object.keys(matchedRecipe.produces)[0];
+      craftResult.className = craftResult.dataset.type;
+      craftResult.innerHTML = "";
+      const countSpan = document.createElement("span");
+      countSpan.className = "item-count";
+      countSpan.textContent = Object.values(matchedRecipe.produces)[0];
+      craftResult.appendChild(countSpan);
+      craftResult.classList.remove("empty");
+      btnCraft.disabled = false;
+    } else {
+      craftResult.dataset.type = "";
+      craftResult.className = "empty";
+      craftResult.innerHTML = "";
+      btnCraft.disabled = true;
+    }
+  }
+
+  // Função para comparar receitas (3x3)
+  // patternMatrix é 3x3, currentPattern é array 9 com tipo ou null
+  function matchPattern(patternMatrix, currentPattern) {
+    // Converte currentPattern para matriz 3x3
+    let currMat = [];
+    for (let i = 0; i < 3; i++) currMat.push(currentPattern.slice(i * 3, i * 3 + 3));
+
+    for (let y = 0; y < 3; y++) {
+      for (let x = 0; x < 3; x++) {
+        const patCell = patternMatrix[y][x];
+        const curCell = currMat[y][x];
+        // null ou undefined são considerados vazios
+        if ((patCell === null || patCell === undefined) && (curCell === null || curCell === "" || curCell === undefined)) continue;
+        if (patCell !== curCell) return false;
+      }
+    }
+    return true;
+  }
+
+  // Aplica craft: tira itens do crafting, adiciona item no inventário
+  function applyCraft() {
+    // Pega receita correta
+    const currentPattern = craftSlots.map(s => s.dataset.type || null);
+    let matchedRecipe = null;
+    craftingRecipes.forEach(recipe => {
+      if (matchPattern(recipe.pattern, currentPattern)) matchedRecipe = recipe;
+    });
+    if (!matchedRecipe) return;
+
+    // Remove itens usados do inventário (ou crafting slots)
+    // Inventário para blocos
+    // Para cada item do crafting, remove 1 do inventário de blocos ou itens
+    currentPattern.forEach(type => {
+      if (!type) return;
+      if (blockCounts[type] && blockCounts[type] > 0) {
+        blockCounts[type]--;
+      } else if (items[type] && items[type] > 0) {
+        items[type]--;
+      }
+    });
+
+    // Adiciona item craftado no inventário de itens
+    const prodKey = Object.keys(matchedRecipe.produces)[0];
+    const prodQty = matchedRecipe.produces[prodKey];
+    items[prodKey] = (items[prodKey] || 0) + prodQty;
+
+    // Limpa crafting
+    craftSlots.forEach(slot => {
+      slot.dataset.type = "";
+    });
+
+    updateAll();
+    updateCrafting();
+    saveWorld();
+  }
+
+  // Drag & Drop na área crafting
+  function setupCraftSlotDragEvents(slot) {
+    slot.addEventListener("dragover", e => {
+      e.preventDefault();
+      slot.classList.add("dragover");
+    });
+    slot.addEventListener("dragleave", e => {
+      slot.classList.remove("dragover");
+    });
+    slot.addEventListener("drop", e => {
+      e.preventDefault();
+      slot.classList.remove("dragover");
+      if (!draggingItem) return;
+
+      const slotType = slot.dataset.type || "";
+      // Se já tem item no slot, não pode colocar outro (alternativamente, pode implementar swap)
+      if (slotType) return;
+
+      // Remove do inventário origem
+      if (draggingItem.source === "inventory") {
+        if (blockCounts[draggingItem.type] > 0) {
+          blockCounts[draggingItem.type]--;
+          slot.dataset.type = draggingItem.type;
+        }
+      } else if (draggingItem.source === "itemInventory") {
+        if (items[draggingItem.type] > 0) {
+          items[draggingItem.type]--;
+          slot.dataset.type = draggingItem.type;
+        }
+      }
+      updateAll();
+      updateCrafting();
+      draggingItem = null;
+    });
+  }
+
+  // Remover item do crafting arrastando para fora (voltar para inventário)
+  craftingGrid.addEventListener("dragstart", e => {
+    if (!e.target.classList.contains("craft-slot")) return;
+    const type = e.target.dataset.type;
+    if (!type) return;
+    draggingItem = { type, source: "crafting", index: +e.target.dataset.index };
+    e.dataTransfer.setData("text/plain", type);
+    // Remove item do slot imediatamente ao arrastar
+    e.target.dataset.type = "";
+    updateCrafting();
+  });
+  // Soltar item arrastado no inventário para devolver
+  inventoryDiv.addEventListener("dragover", e => {
+    e.preventDefault();
+  });
+  inventoryDiv.addEventListener("drop", e => {
+    e.preventDefault();
+    if (!draggingItem) return;
+    if (draggingItem.source === "crafting") {
+      // Devolve para inventário de blocos se é bloco
+      if (solidBlocks.includes(draggingItem.type)) {
+        blockCounts[draggingItem.type] = (blockCounts[draggingItem.type] || 0) + 1;
+      } else if (items[draggingItem.type] !== undefined) {
+        items[draggingItem.type] = (items[draggingItem.type] || 0) + 1;
+      }
+      draggingItem = null;
+      updateAll();
+      updateCrafting();
+    }
+  });
+  // Também permitir devolver itens arrastando para item inventory
+  itemInventoryDiv.addEventListener("dragover", e => e.preventDefault());
+  itemInventoryDiv.addEventListener("drop", e => {
+    e.preventDefault();
+    if (!draggingItem) return;
+    if (draggingItem.source === "crafting") {
+      if (items[draggingItem.type] !== undefined) {
+        items[draggingItem.type] = (items[draggingItem.type] || 0) + 1;
+      } else if (solidBlocks.includes(draggingItem.type)) {
+        blockCounts[draggingItem.type] = (blockCounts[draggingItem.type] || 0) + 1;
+      }
+      draggingItem = null;
+      updateAll();
+      updateCrafting();
+    }
+  });
+
+  // Botões do crafting
+  btnCraft.addEventListener("click", () => {
+    applyCraft();
+  });
+  btnCloseCraft.addEventListener("click", () => {
+    craftingUI.style.display = "none";
+  });
+
+  btnOpenCrafting.addEventListener("click", () => {
+    craftingUI.style.display = "block";
+  });
+
+  // Botões menu
+  document.getElementById("btnNewGame").addEventListener("click", () => {
+    createEmptyWorld();
+    blockCounts = { grass: 5, dirt: 5, stone: 3, wood: 2 };
+    items = { plank: 0, pickaxe: 0 };
+    playerX = 10;
+    playerY = 7;
+    saveWorld();
+    startGame();
+  });
+
+  document.getElementById("btnContinue").addEventListener("click", () => {
+    loadWorld();
+    startGame();
+  });
+
+  // Inicia o jogo mostrando tudo e escondendo menu
+  function startGame() {
+    menu.style.display = "none";
+    gameDiv.style.display = "grid";
+    inventoryDiv.style.display = "flex";
+    itemInventoryDiv.style.display = "flex";
+    btnOpenCrafting.style.display = "block";
+
+    updateAll();
+    createCraftSlots();
+
+    // Loop simples para mover mobs e atualizar mundo
+    setInterval(() => {
+      moveMobs();
+      renderWorld();
+    }, 1000);
+  }
+
+})();
+</script>
+
 </body>
 </html>

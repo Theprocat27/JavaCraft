@@ -1,0 +1,51 @@
+#world-container {
+  width: 640px;   /* 20 blocos * 32px */
+  height: 320px;  /* 10 blocos * 32px */
+  overflow: hidden;  /* esconde o que passar do container */
+  position: relative;
+  border: 2px solid black;
+}
+
+#world {
+  position: absolute;
+  width: 6400px;  /* 200 colunas * 32px */
+  height: 960px;  /* 30 linhas * 32px */
+  display: flex;
+  flex-wrap: wrap;
+  transform: translate(0, 0);
+}
+
+
+.block {
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  border: 1px solid #999;
+}
+
+
+.grass {
+  background-image: url("grass.png");
+}
+
+.dirt {
+  background-image: url("dirt.png");
+}
+
+.leaves {
+  background-image: url('leaves.png');
+}
+
+/* Para a hotbar, igual: */
+
+.hotbar-block.grass {
+  background-image: url("grass.png");
+}
+
+.hotbar-block.dirt {
+  background-image: url("dirt.png");
+}
+
+.hotbar-block.leaves {
+  background-image: url('leaves.png');
+}
