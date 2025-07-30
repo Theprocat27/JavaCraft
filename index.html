@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR" >
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini Minecraft JS com Gravidade e Inventário</title>
+  <style>
+    body {
+      background-color: #87ceeb; /* céu */
+      margin: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      user-select: none;
+    }
+    #world {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(20, 32px);
+      grid-template-rows: repeat(10, 32px);
+      position: relative;
+      background-color: #87ceeb;
+    }
+    .block {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #999;
+      box-sizing: border-box;
+    }
+    .grass { background-color: #228B22; }
+    .dirt  { background-color: #8B4513; }
+    .empty { background-color: transparent; border: none; }
+
+    /* Player */
+    #player {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      background-color: red;
+      border: 2px solid black;
+      box-sizing: border-box;
+      transition: top 0.1s, left 0.1s;
+      pointer-events: none;
+      z-index: 10;
+      border-radius: 4px;
+    }
+
+    /* Hotbar */
+    #hotbar {
+      height: 50px;
+      background: #333;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      padding: 5px;
+      user-select: none;
+      color: white;
+      font-family: monospace;
+      font-weight: bold;
+    }
+    .hotbar-slot {
+      width: 60px;
+      height: 40px;
+      border: 2px solid #666;
+      box-sizing: border-box;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background-color: #222;
+      transition: border-color 0.3s;
+      position: relative;
+      color: white;
+      font-size: 16px;
+    }
+    .hotbar-slot.selected {
+      border-color: yellow;
+    }
+    .hotbar-block {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #999;
+      border-radius: 2px;
+      margin-bottom: 2px;
+    }
+    .hotbar-block.grass { background-color: #228B22; }
+    .hotbar-block.dirt { background-color: #8B4513; }
+    .count {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 14px;
+      color: #fff;
+      text-shadow: 1px 1px 3px #000;
+    }
+  </style>
+</head>
+<body>
+  <div id="world"></div>
+  <div id="hotbar"></div>
+
+  <script src="game.js"></script>
+</body>
+</html>
